@@ -15,7 +15,10 @@
     "test": "npm run test:format",
     "test:format": "prettier --check .",
     "format": "npx prettier --write .",
-    "update-issues": "tsx scripts/update-issues.ts"
+    "update-issues": "tsx scripts/update-issues.ts",
+    "mark-duplicates": "tsx scripts/mark-duplicates.ts",
+    "close-duplicates": "tsx scripts/close-duplicates.ts",
+    "remove-feature-labels": "tsx scripts/remove-feature-labels.ts"
   },
   "devDependencies": {
     "@octokit/plugin-throttling": "^11.0.3",
