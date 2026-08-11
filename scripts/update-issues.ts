@@ -41,10 +41,18 @@ interface VendorPosition {
     | "blocked";
 }
 
+interface MdnDoc {
+  slug: string;
+  title: string;
+  anchor: string | null;
+  url: string;
+}
+
 type MappingsData = Record<
   string,
   {
     "standards-positions"?: VendorPosition[];
+    "mdn-docs"?: MdnDoc[];
   }
 >;
 
@@ -119,7 +127,11 @@ const dateFormat = new Intl.DateTimeFormat("en", {
   timeZone: "UTC",
 });
 
-function issueBody(id: string, data: (typeof features)[string]) {
+function issueBody(
+  id: string,
+  data: (typeof features)[string],
+  mdnDocs?: MdnDoc[],
+) {
   const supportSummary: Record<string, boolean> = {};
   const supportLines = [];
   for (const [browser, { name, releases }] of Object.entries(browsers)) {
@@ -150,8 +162,20 @@ function issueBody(id: string, data: (typeof features)[string]) {
     </details>
   `;
 
-  // TODO: include MDN links (before caniuse link) when we have web-features-mappings
-  // as a dependency (see above).
+  const learnMoreLinks = [
+    ...(mdnDocs?.map((doc) =>
+      mdnDocs.length > 1
+        ? `- [MDN (${doc.title})](${doc.url})`
+        : `- [MDN](${doc.url})`,
+    ) ?? []),
+    ...(data.caniuse
+      ? [`- [caniuse.com](https://caniuse.com/${data.caniuse})`]
+      : []),
+    `- [web features explorer](https://web-platform-dx.github.io/web-features-explorer/features/${id})`,
+    `- [webstatus.dev](https://webstatus.dev/features/${id})`,
+    `- [Specification](${data.spec})`,
+  ];
+
   return dedent`
     _This GitHub issue is for collecting web developer signals for ${escape(data.name)}._
 
@@ -188,25 +212,25 @@ function issueBody(id: string, data: (typeof features)[string]) {
 
     You can learn more about this feature here:
 
-    ${data.caniuse ? `- [caniuse.com](https://caniuse.com/${data.caniuse})` : ""}
-    - [web features explorer](https://web-platform-dx.github.io/web-features-explorer/features/${id})
-    - [webstatus.dev](https://webstatus.dev/features/${id})
-    - [Specification](${data.spec})
+    ${learnMoreLinks.join("\n    ")}
 
     <!-- web-features:${id} -->
   `;
 }
 
-// Get a map of features to skip with a reason for logging.
-async function getFeaturesToSkip(): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-
+async function getMappingsData(): Promise<MappingsData> {
   const resp = await fetch(mappingsUrl);
   if (!resp.ok) {
     throw new Error(`Failed to fetch ${mappingsUrl}: ${resp.statusText}`);
   }
 
-  const mappings = (await resp.json()) as MappingsData;
+  return (await resp.json()) as MappingsData;
+}
+
+// Get a map of features to skip with a reason for logging.
+function getFeaturesToSkip(mappings: MappingsData): Map<string, string> {
+  const map = new Map<string, string>();
+
   for (const [feature, data] of Object.entries(mappings)) {
     const positions = data["standards-positions"];
     if (!positions) {
@@ -232,7 +256,8 @@ async function getFeaturesToSkip(): Promise<Map<string, string>> {
 }
 
 async function update() {
-  const skipFeatures = await getFeaturesToSkip();
+  const mappings = await getMappingsData();
+  const skipFeatures = getFeaturesToSkip(mappings);
 
   const ThrottlingOctokit = Octokit.plugin(throttling);
 
@@ -379,7 +404,7 @@ async function update() {
     }
 
     const title = data.name;
-    const body = issueBody(id, data);
+    const body = issueBody(id, data, mappings[id]?.["mdn-docs"]);
     const issue = openIssues.get(id);
 
     if (data.status.baseline && !issue) {
