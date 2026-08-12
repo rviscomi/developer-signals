@@ -162,19 +162,22 @@ function issueBody(
     </details>
   `;
 
-  const learnMoreLinks = [
-    ...(mdnDocs?.map((doc) =>
-      mdnDocs.length > 1
-        ? `- [MDN (${doc.title})](${doc.url})`
-        : `- [MDN](${doc.url})`,
-    ) ?? []),
-    ...(data.caniuse
-      ? [`- [caniuse.com](https://caniuse.com/${data.caniuse})`]
-      : []),
+  const learnMoreLinks: string[] = [];
+
+  for (const doc of mdnDocs ?? []) {
+    const label = mdnDocs!.length > 1 ? `MDN (${doc.title})` : "MDN";
+    learnMoreLinks.push(`- [${label}](${doc.url})`);
+  }
+
+  if (data.caniuse) {
+    learnMoreLinks.push(`- [caniuse.com](https://caniuse.com/${data.caniuse})`);
+  }
+
+  learnMoreLinks.push(
     `- [web features explorer](https://web-platform-dx.github.io/web-features-explorer/features/${id})`,
     `- [webstatus.dev](https://webstatus.dev/features/${id})`,
     `- [Specification](${data.spec})`,
-  ];
+  );
 
   return dedent`
     _This GitHub issue is for collecting web developer signals for ${escape(data.name)}._
